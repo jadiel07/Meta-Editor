@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Projeto: Editor</title>
+<style>
+  :root{
+    --bg: #14161a;
+    --panel: #1c1f24;
+    --panel-2: #22262c;
+    --line: #2c3138;
+    --text: #e8e6e1;
+    --muted: #878d96;
+    --cyan: #4ce0d2;
+    --magenta: #ff4d8d;
+    --amber: #ffb454;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    padding:32px 20px 80px;
+  }
+  .wrap{max-width:920px;margin:0 auto;}
+
+  .mono{font-family:'JetBrains Mono','Courier New',monospace;}
+
+  header{
+    border-bottom:1px solid var(--line);
+    padding-bottom:24px;
+    margin-bottom:28px;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:16px;
+  }
+  .eyebrow{
+    font-size:11px;
+    letter-spacing:.18em;
+    text-transform:uppercase;
+    color:var(--cyan);
+    margin:0 0 8px;
+  }
+  h1{
+    margin:0;
+    font-size:clamp(28px,5vw,42px);
+    font-weight:800;
+    letter-spacing:-0.02em;
+    line-height:1.05;
+  }
+  h1 span{color:var(--magenta);}
+  .timecode{
+    text-align:right;
+  }
+  .timecode .big{
+    font-size:28px;
+    font-weight:600;
+    letter-spacing:.05em;
+  }
+  .timecode .small{
+    font-size:11px;
+    color:var(--muted);
+    letter-spacing:.1em;
+    text-transform:uppercase;
+  }
+
+  /* Timeline scrubber */
+  .scrubber{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:20px 20px 14px;
+    margin-bottom:28px;
+    overflow:hidden;
+  }
+  .scrubber-label{
+    font-size:11px;
+    color:var(--muted);
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    margin-bottom:14px;
+  }
+  .track{
+    position:relative;
+    height:46px;
+    background:var(--panel-2);
+    border-radius:6px;
+    display:flex;
+    overflow:hidden;
+  }
+  .month-seg{
+    flex:1;
+    border-right:1px solid var(--line);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:11px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--muted);
+    position:relative;
+  }
+  .month-seg:last-child{border-right:none;}
+  .month-seg.done{color:var(--cyan);background:rgba(76,224,210,0.07);}
+  .playhead{
+    position:absolute;
+    top:-6px;
+    bottom:-6px;
+    width:2px;
+    background:var(--magenta);
+    box-shadow:0 0 8px var(--magenta);
+  }
+  .playhead::before{
+    content:'';
+    position:absolute;
+    top:-6px;
+    left:50%;
+    transform:translateX(-50%);
+    width:0;height:0;
+    border-left:5px solid transparent;
+    border-right:5px solid transparent;
+    border-top:6px solid var(--magenta);
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns:1fr;
+    gap:18px;
+  }
+  @media(min-width:720px){
+    .grid{grid-template-columns:1fr 1fr;}
+    .full{grid-column:1/-1;}
+  }
+
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:22px;
+  }
+  .card h2{
+    margin:0 0 4px;
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:.02em;
+  }
+  .card .sub{
+    font-size:12px;
+    color:var(--muted);
+    margin:0 0 16px;
+  }
+
+  /* Primeiro cliente */
+  .client-row{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    margin-bottom:14px;
+  }
+  .toggle{
+    width:46px;height:26px;
+    border-radius:20px;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    cursor:pointer;
+    position:relative;
+    flex-shrink:0;
+    transition:background .2s;
+  }
+  .toggle.on{background:var(--cyan);}
+  .toggle .knob{
+    position:absolute;
+    top:2px;left:2px;
+    width:20px;height:20px;
+    border-radius:50%;
+    background:var(--text);
+    transition:transform .2s;
+  }
+  .toggle.on .knob{transform:translateX(20px);background:#0d1210;}
+  .client-status{font-size:14px;}
+  .client-status .yes{color:var(--cyan);font-weight:600;}
+
+  input[type="date"], input[type="text"], input[type="number"], select{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--text);
+    border-radius:6px;
+    padding:8px 10px;
+    font-size:13px;
+    font-family:inherit;
+    width:100%;
+  }
+  input[type="date"]{color-scheme:dark;}
+  label.field-label{
+    font-size:11px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    display:block;
+    margin-bottom:6px;
+  }
+
+  /* Faturamento table */
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{
+    text-align:left;
+    font-size:10px;
+    letter-spacing:.1em;
+    text-transform:uppercase;
+    color:var(--muted);
+    font-weight:600;
+    padding:0 8px 8px 0;
+  }
+  td{padding:6px 8px 6px 0;border-top:1px solid var(--line);}
+  td input{padding:6px 8px;font-size:13px;}
+  .month-name{font-weight:600;font-size:13px;}
+  .bar-cell{width:100%;}
+  .bar-bg{
+    height:6px;
+    background:var(--panel-2);
+    border-radius:3px;
+    overflow:hidden;
+    margin-top:4px;
+  }
+  .bar-fill{
+    height:100%;
+    background:linear-gradient(90deg,var(--cyan),var(--magenta));
+    border-radius:3px;
+    transition:width .3s;
+  }
+  .totals{
+    display:flex;
+    justify-content:space-between;
+    margin-top:14px;
+    padding-top:14px;
+    border-top:1px solid var(--line);
+    font-size:13px;
+  }
+  .totals .num{font-size:20px;font-weight:700;color:var(--amber);}
+
+  /* Custom goals */
+  .goal-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:9px 0;
+    border-top:1px solid var(--line);
+  }
+  .goal-item:first-of-type{border-top:none;}
+  .check{
+    width:20px;height:20px;
+    border-radius:5px;
+    border:1.5px solid var(--muted);
+    flex-shrink:0;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;
+    color:transparent;
+  }
+  .check.done{background:var(--cyan);border-color:var(--cyan);color:#0d1210;}
+  .goal-text{flex:1;font-size:14px;}
+  .goal-text.done{color:var(--muted);text-decoration:line-through;}
+  .remove-btn{
+    background:none;border:none;color:var(--muted);
+    cursor:pointer;font-size:16px;padding:2px 6px;
+    line-height:1;
+  }
+  .remove-btn:hover{color:var(--magenta);}
+  .add-row{
+    display:flex;gap:8px;margin-top:14px;
+  }
+  .add-row input{flex:1;}
+  .add-btn{
+    background:var(--cyan);
+    color:#0d1210;
+    border:none;
+    border-radius:6px;
+    padding:8px 16px;
+    font-weight:700;
+    font-size:13px;
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .add-btn:hover{opacity:.9;}
+
+  .log-item{
+    border-top:1px solid var(--line);
+    padding:10px 0;
+  }
+  .log-item:first-child{border-top:none;padding-top:0;}
+  .log-date{
+    font-size:10px;
+    color:var(--muted);
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    margin-bottom:3px;
+  }
+  .log-text{font-size:13px;line-height:1.4;}
+  .log-empty{color:var(--muted);font-size:13px;margin:0;}
+
+  .save-note{
+    text-align:center;
+    font-size:11px;
+    color:var(--muted);
+    margin-top:26px;
+    letter-spacing:.05em;
+  }
+  .save-note .dot{
+    display:inline-block;width:6px;height:6px;border-radius:50%;
+    background:var(--cyan);margin-right:6px;
+    animation:pulse 2s infinite;
+  }
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.3;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <p class="eyebrow">Projeto pessoal &middot; 2026</p>
+      <h1>Virar <span>editor</span><br>até dezembro</h1>
+    </div>
+    <div class="timecode">
+      <div class="big mono" id="countdown">--</div>
+      <div class="small">dias restantes</div>
+    </div>
+  </header>
+
+  <div class="scrubber">
+    <div class="scrubber-label">Linha do tempo &middot; ago — dez 2026</div>
+    <div class="track" id="track"></div>
+  </div>
+
+  <div class="grid">
+
+    <div class="card">
+      <h2>Primeiro cliente</h2>
+      <p class="sub">O corte que destrava o resto do projeto.</p>
+      <div class="client-row">
+        <div class="toggle" id="clientToggle"><div class="knob"></div></div>
+        <div class="client-status" id="clientStatus">Ainda não fechado</div>
+      </div>
+      <div id="clientDateWrap" style="display:none;">
+        <label class="field-label">Data do fechamento</label>
+        <input type="date" id="clientDate" style="margin-bottom:12px;">
+
+        <label class="field-label">Canal de aquisição</label>
+        <select id="clientChannel" style="margin-bottom:12px;">
+          <option value="">Selecione...</option>
+          <option value="Indicação">Indicação</option>
+          <option value="Instagram">Instagram</option>
+          <option value="LinkedIn">LinkedIn</option>
+          <option value="Freelancer (Workana/99Freelas)">Freelancer (Workana/99Freelas)</option>
+          <option value="Cold DM">Cold DM</option>
+          <option value="Outro">Outro</option>
+        </select>
+
+        <label class="field-label">Valor do contrato (R$)</label>
+        <input type="number" id="clientValue" min="0" step="50" placeholder="Ex: 800">
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Meta de saída</h2>
+      <p class="sub">Renda mensal alvo até dezembro.</p>
+      <label class="field-label">Valor alvo por mês (R$)</label>
+      <input type="number" id="targetIncome" placeholder="Ex: 2000" min="0" step="50">
+    </div>
+
+    <div class="card full">
+      <h2>Faturamento mensal</h2>
+      <p class="sub">Quanto entrou de fato em cada mês, comparado à meta.</p>
+      <table>
+        <thead>
+          <tr><th>Mês</th><th>Faturado (R$)</th><th class="bar-cell">Progresso</th></tr>
+        </thead>
+        <tbody id="incomeBody"></tbody>
+      </table>
+      <div class="totals">
+        <div>Total no período <span class="mono" id="totalPeriod">R$ 0</span></div>
+        <div>Média mensal <span class="num mono" id="avgMonth">R$ 0</span></div>
+      </div>
+    </div>
+
+    <div class="card full">
+      <h2>Funil de prospecção</h2>
+      <p class="sub">Quantas propostas/contatos você mandou em cada mês — o esforço que leva até o próximo cliente.</p>
+      <table>
+        <thead>
+          <tr><th>Mês</th><th>Propostas enviadas</th></tr>
+        </thead>
+        <tbody id="prospectBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card full">
+      <h2>Entregas / portfólio</h2>
+      <p class="sub">Quantos vídeos ou projetos você editou em cada mês.</p>
+      <table>
+        <thead>
+          <tr><th>Mês</th><th>Projetos entregues</th></tr>
+        </thead>
+        <tbody id="deliveriesBody"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>Ferramentas</h2>
+      <p class="sub">O que você já domina como editor.</p>
+      <div id="skillsList"></div>
+      <div class="add-row">
+        <input type="text" id="newSkillInput" placeholder="Ex: DaVinci Resolve">
+        <button class="add-btn" id="addSkillBtn">Adicionar</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Diário de progresso</h2>
+      <p class="sub">Uma nota rápida por semana: o que tentou, o que aprendeu.</p>
+      <div class="add-row" style="margin-bottom:14px;">
+        <input type="text" id="newLogInput" placeholder="O que rolou essa semana...">
+        <button class="add-btn" id="addLogBtn">Registrar</button>
+      </div>
+      <div id="logList"></div>
+    </div>
+
+    <div class="card full">
+      <h2>Outras metas</h2>
+      <p class="sub">Qualquer outro objetivo até dezembro.</p>
+      <div id="goalsList"></div>
+      <div class="add-row">
+        <input type="text" id="newGoalInput" placeholder="Ex: montar portfólio com 5 projetos">
+        <button class="add-btn" id="addGoalBtn">Adicionar</button>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="save-note"><span class="dot"></span>salvo automaticamente</div>
+</div>
+
+<script>
+const MONTHS = ['ago','set','out','nov','dez'];
+const MONTH_NAMES = {ago:'Agosto',set:'Setembro',out:'Outubro',nov:'Novembro',dez:'Dezembro'};
+const STORAGE_KEY = 'metas-editor-state';
+
+let state = {
+  clientDone:false,
+  clientDate:'',
+  clientChannel:'',
+  clientValue:'',
+  targetIncome:0,
+  income:{ago:'',set:'',out:'',nov:'',dez:''},
+  prospect:{ago:'',set:'',out:'',nov:'',dez:''},
+  deliveries:{ago:'',set:'',out:'',nov:'',dez:''},
+  skills:[
+    {name:'Premiere Pro', done:false},
+    {name:'DaVinci Resolve', done:false},
+    {name:'After Effects', done:false},
+    {name:'Motion Graphics', done:false},
+    {name:'Color Grading', done:false},
+    {name:'Sound Design', done:false}
+  ],
+  logs:[],
+  goals:[]
+};
+
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      state = Object.assign(state, parsed);
+    }
+  }catch(e){
+    console.error('Falha ao carregar dados salvos', e);
+  }
+  render();
+}
+
+function saveState(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }catch(e){
+    console.error('Falha ao salvar', e);
+  }
+}
+
+function daysUntilDec31(){
+  const now = new Date();
+  const end = new Date(now.getFullYear(), 11, 31);
+  const diff = Math.ceil((end - now) / (1000*60*60*24));
+  return diff > 0 ? diff : 0;
+}
+
+function renderCountdown(){
+  document.getElementById('countdown').textContent = daysUntilDec31();
+}
+
+function renderTrack(){
+  const track = document.getElementById('track');
+  track.innerHTML = '';
+  const now = new Date();
+  const currentMonthIdx = now.getMonth() - 7; // ago = index 0 (month 7)
+  MONTHS.forEach((m, i)=>{
+    const seg = document.createElement('div');
+    seg.className = 'month-seg' + (i < currentMonthIdx ? ' done' : '');
+    seg.textContent = m;
+    track.appendChild(seg);
+  });
+  if(currentMonthIdx >= 0 && currentMonthIdx < MONTHS.length){
+    const dayOfMonth = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+    const fracInMonth = dayOfMonth / daysInMonth;
+    const totalFrac = (currentMonthIdx + fracInMonth) / MONTHS.length;
+    const playhead = document.createElement('div');
+    playhead.className = 'playhead';
+    playhead.style.left = (totalFrac*100) + '%';
+    track.appendChild(playhead);
+  }
+}
+
+function renderClient(){
+  const toggle = document.getElementById('clientToggle');
+  const status = document.getElementById('clientStatus');
+  const dateWrap = document.getElementById('clientDateWrap');
+  const dateInput = document.getElementById('clientDate');
+  toggle.classList.toggle('on', state.clientDone);
+  dateWrap.style.display = state.clientDone ? 'block' : 'none';
+  dateInput.value = state.clientDate || '';
+  document.getElementById('clientChannel').value = state.clientChannel || '';
+  document.getElementById('clientValue').value = state.clientValue || '';
+  status.innerHTML = state.clientDone
+    ? '<span class="yes">Fechado ✓</span>'
+    : 'Ainda não fechado';
+}
+
+function renderIncome(){
+  document.getElementById('targetIncome').value = state.targetIncome || '';
+  const body = document.getElementById('incomeBody');
+  body.innerHTML = '';
+  let total = 0, monthsWithData = 0;
+  const target = Number(state.targetIncome) || 0;
+
+  MONTHS.forEach(m=>{
+    const val = Number(state.income[m]) || 0;
+    if(state.income[m] !== '' && state.income[m] !== undefined) { total += val; if(val>0) monthsWithData++; }
+    const pct = target > 0 ? Math.min(100, (val/target)*100) : 0;
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="month-name">${MONTH_NAMES[m]}</td>
+      <td><input type="number" min="0" step="50" data-month="${m}" class="income-input" value="${state.income[m] || ''}" placeholder="0"></td>
+      <td class="bar-cell">
+        <div class="bar-bg"><div class="bar-fill" style="width:${pct}%"></div></div>
+      </td>
+    `;
+    body.appendChild(tr);
+  });
+
+  document.getElementById('totalPeriod').textContent = 'R$ ' + total.toLocaleString('pt-BR');
+  const avg = monthsWithData > 0 ? Math.round(total/monthsWithData) : 0;
+  document.getElementById('avgMonth').textContent = 'R$ ' + avg.toLocaleString('pt-BR');
+
+  body.querySelectorAll('.income-input').forEach(inp=>{
+    inp.addEventListener('input', (e)=>{
+      state.income[e.target.dataset.month] = e.target.value;
+      renderIncome();
+      saveState();
+    });
+  });
+}
+
+function renderGoals(){
+  const list = document.getElementById('goalsList');
+  list.innerHTML = '';
+  if(state.goals.length === 0){
+    list.innerHTML = '<p class="sub" style="margin:0;">Nenhuma meta adicionada ainda.</p>';
+  }
+  state.goals.forEach((g, idx)=>{
+    const row = document.createElement('div');
+    row.className = 'goal-item';
+    row.innerHTML = `
+      <div class="check ${g.done ? 'done' : ''}" data-idx="${idx}">${g.done ? '✓' : ''}</div>
+      <div class="goal-text ${g.done ? 'done' : ''}">${g.text}</div>
+      <button class="remove-btn" data-idx="${idx}">&times;</button>
+    `;
+    list.appendChild(row);
+  });
+
+  list.querySelectorAll('.check').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const idx = Number(el.dataset.idx);
+      state.goals[idx].done = !state.goals[idx].done;
+      renderGoals();
+      saveState();
+    });
+  });
+  list.querySelectorAll('.remove-btn').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const idx = Number(el.dataset.idx);
+      state.goals.splice(idx,1);
+      renderGoals();
+      saveState();
+    });
+  });
+}
+
+function renderSimpleMonthTable(bodyId, key){
+  const body = document.getElementById(bodyId);
+  body.innerHTML = '';
+  MONTHS.forEach(m=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="month-name">${MONTH_NAMES[m]}</td>
+      <td><input type="number" min="0" step="1" data-month="${m}" data-key="${key}" class="simple-month-input" value="${state[key][m] || ''}" placeholder="0"></td>
+    `;
+    body.appendChild(tr);
+  });
+  body.querySelectorAll('.simple-month-input').forEach(inp=>{
+    inp.addEventListener('input', (e)=>{
+      state[e.target.dataset.key][e.target.dataset.month] = e.target.value;
+      saveState();
+    });
+  });
+}
+
+function renderSkills(){
+  const list = document.getElementById('skillsList');
+  list.innerHTML = '';
+  state.skills.forEach((s, idx)=>{
+    const row = document.createElement('div');
+    row.className = 'goal-item';
+    row.innerHTML = `
+      <div class="check ${s.done ? 'done' : ''}" data-idx="${idx}">${s.done ? '✓' : ''}</div>
+      <div class="goal-text ${s.done ? 'done' : ''}">${s.name}</div>
+      <button class="remove-btn" data-idx="${idx}">&times;</button>
+    `;
+    list.appendChild(row);
+  });
+  list.querySelectorAll('.check').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const idx = Number(el.dataset.idx);
+      state.skills[idx].done = !state.skills[idx].done;
+      renderSkills();
+      saveState();
+    });
+  });
+  list.querySelectorAll('.remove-btn').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const idx = Number(el.dataset.idx);
+      state.skills.splice(idx,1);
+      renderSkills();
+      saveState();
+    });
+  });
+}
+
+function renderLogs(){
+  const list = document.getElementById('logList');
+  list.innerHTML = '';
+  if(state.logs.length === 0){
+    list.innerHTML = '<p class="log-empty">Nenhum registro ainda.</p>';
+    return;
+  }
+  [...state.logs].reverse().forEach((log)=>{
+    const realIdx = state.logs.indexOf(log);
+    const item = document.createElement('div');
+    item.className = 'log-item';
+    const d = new Date(log.date);
+    const dateStr = d.toLocaleDateString('pt-BR', {day:'2-digit', month:'short'});
+    item.innerHTML = `
+      <div class="log-date">${dateStr}</div>
+      <div class="log-text">${log.text}</div>
+    `;
+    list.appendChild(item);
+  });
+}
+
+function render(){
+  renderCountdown();
+  renderTrack();
+  renderClient();
+  renderIncome();
+  renderSimpleMonthTable('prospectBody', 'prospect');
+  renderSimpleMonthTable('deliveriesBody', 'deliveries');
+  renderSkills();
+  renderLogs();
+  renderGoals();
+}
+
+document.getElementById('clientToggle').addEventListener('click', ()=>{
+  state.clientDone = !state.clientDone;
+  if(state.clientDone && !state.clientDate){
+    state.clientDate = new Date().toISOString().slice(0,10);
+  }
+  renderClient();
+  saveState();
+});
+
+document.getElementById('clientDate').addEventListener('change', (e)=>{
+  state.clientDate = e.target.value;
+  saveState();
+});
+
+document.getElementById('clientChannel').addEventListener('change', (e)=>{
+  state.clientChannel = e.target.value;
+  saveState();
+});
+
+document.getElementById('clientValue').addEventListener('input', (e)=>{
+  state.clientValue = e.target.value;
+  saveState();
+});
+
+document.getElementById('targetIncome').addEventListener('input', (e)=>{
+  state.targetIncome = e.target.value;
+  renderIncome();
+  saveState();
+});
+
+document.getElementById('addGoalBtn').addEventListener('click', ()=>{
+  const input = document.getElementById('newGoalInput');
+  const val = input.value.trim();
+  if(val){
+    state.goals.push({text:val, done:false});
+    input.value='';
+    renderGoals();
+    saveState();
+  }
+});
+document.getElementById('newGoalInput').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){ document.getElementById('addGoalBtn').click(); }
+});
+
+document.getElementById('addSkillBtn').addEventListener('click', ()=>{
+  const input = document.getElementById('newSkillInput');
+  const val = input.value.trim();
+  if(val){
+    state.skills.push({name:val, done:false});
+    input.value='';
+    renderSkills();
+    saveState();
+  }
+});
+document.getElementById('newSkillInput').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){ document.getElementById('addSkillBtn').click(); }
+});
+
+document.getElementById('addLogBtn').addEventListener('click', ()=>{
+  const input = document.getElementById('newLogInput');
+  const val = input.value.trim();
+  if(val){
+    state.logs.push({date: new Date().toISOString(), text: val});
+    input.value='';
+    renderLogs();
+    saveState();
+  }
+});
+document.getElementById('newLogInput').addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter'){ document.getElementById('addLogBtn').click(); }
+});
+
+loadState();
+setInterval(renderCountdown, 1000*60*30);
+</script>
+</body>
+</html>
